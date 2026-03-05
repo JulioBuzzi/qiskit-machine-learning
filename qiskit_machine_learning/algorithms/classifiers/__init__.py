@@ -16,5 +16,6 @@ from .neural_network_classifier import NeuralNetworkClassifier
 from .pegasos_qsvc import PegasosQSVC
 from .qsvc import QSVC
 from .vqc import VQC
+from .quantum_decision_tree import QuantumDecisionTreeClassifier
 
-__all__ = ["NeuralNetworkClassifier", "QSVC", "PegasosQSVC", "VQC"]
+__all__ = ["NeuralNetworkClassifier", "QSVC", "PegasosQSVC", "VQC","QuantumDecisionTreeClassifier"]
