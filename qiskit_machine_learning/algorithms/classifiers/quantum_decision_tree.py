@@ -122,7 +122,7 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
 
     def _best_split(self, X, y):
 
-        best_gain = -1
+        best_score = -1
         split_idx = None
         split_threshold = None
 
@@ -137,10 +137,47 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
 
                 gain = self._information_gain(y, X_column, threshold)
 
-                if gain > best_gain:
+                if gain == 0:
+                    continue
 
-                    best_gain = gain
+                left_idxs, right_idxs = self._split(X_column, threshold)
+
+                # pegar um representante de cada lado
+                x_left = X[left_idxs[0]]
+                x_right = X[right_idxs[0]]
+
+                # calcular similaridade quântica
+                q_sim = self._quantum_similarity(x_left, x_right)
+
+                # score híbrido (gain information * quantum similarity)
+                score = gain * q_sim
+
+                if score > best_score:
+
+                    best_score = score
                     split_idx = feature_idx
                     split_threshold = threshold
 
         return split_idx, split_threshold
+
+    def predict(self, X):
+
+        predictions = [self._traverse_tree(x, self.root) for x in X]
+
+        return np.array(predictions)
+
+    def _traverse_tree(self, x, node):
+
+        if node.is_leaf():
+            return node.value
+
+        if x[node.feature] <= node.threshold:
+            return self._traverse_tree(x, node.left)
+
+        return self._traverse_tree(x, node.right)
+
+    def score(self, X, y):
+
+        predictions = self.predict(X)
+
+        return np.mean(predictions == y)
