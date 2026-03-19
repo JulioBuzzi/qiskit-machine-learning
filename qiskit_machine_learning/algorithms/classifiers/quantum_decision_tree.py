@@ -35,12 +35,15 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
         # kernel quântico (inicialmente vazio)
         self.quantum_kernel = None
 
+        #kernel cache
+        self.kernel_cache = {}
+
     def fit(self, X, y):
 
         self.n_features = X.shape[1]
 
         # criar feature map
-        feature_map = ZZFeatureMap(feature_dimension=self.n_features, reps=2)
+        feature_map = ZZFeatureMap(feature_dimension=self.n_features, reps=1)
 
         self.quantum_kernel = FidelityQuantumKernel(
             feature_map=feature_map
@@ -50,12 +53,21 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
 
     def _quantum_similarity(self, x1, x2):
 
+        key = tuple(x1) + tuple(x2)
+
+        if key in self.kernel_cache:
+            return self.kernel_cache[key]
+
         x1 = np.array(x1).reshape(1, -1)
         x2 = np.array(x2).reshape(1, -1)
 
         kernel_matrix = self.quantum_kernel.evaluate(x1, x2)
 
-        return kernel_matrix[0][0]
+        value = kernel_matrix[0][0]
+
+        self.kernel_cache[key] = value
+
+        return value
 
     def _grow_tree(self, X, y, depth=0):
 
@@ -69,6 +81,11 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
         best_feature, best_threshold = self._best_split(X, y)
 
         left_idxs, right_idxs = self._split(X[:, best_feature], best_threshold)
+
+        # verificar se o split é válido
+        if len(left_idxs) == 0 or len(right_idxs) == 0:
+            leaf_value = self._most_common_label(y)
+            return Node(value=leaf_value)
 
         left = self._grow_tree(X[left_idxs], y[left_idxs], depth + 1)
         right = self._grow_tree(X[right_idxs], y[right_idxs], depth + 1)
@@ -131,7 +148,7 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
         for feature_idx in range(n_features):
 
             X_column = X[:, feature_idx]
-            thresholds = np.unique(X_column)
+            thresholds = np.percentile(X_column, [20, 40, 60, 80])
 
             for threshold in thresholds:
 
@@ -143,14 +160,16 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
                 left_idxs, right_idxs = self._split(X_column, threshold)
 
                 # pegar um representante de cada lado
-                x_left = X[left_idxs[0]]
-                x_right = X[right_idxs[0]]
+                x_left = np.mean(X[left_idxs], axis=0)
+                x_right = np.mean(X[right_idxs], axis=0)
 
                 # calcular similaridade quântica
                 q_sim = self._quantum_similarity(x_left, x_right)
 
                 # score híbrido (gain information * quantum similarity)
-                score = gain * q_sim
+                q_dist = 1 - q_sim
+                alpha = 0.8
+                score = alpha * gain + (1 - alpha) * q_dist
 
                 if score > best_score:
 
