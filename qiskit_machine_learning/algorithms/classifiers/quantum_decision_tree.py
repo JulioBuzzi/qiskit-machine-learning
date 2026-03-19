@@ -54,16 +54,17 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
     def _quantum_similarity(self, x1, x2):
 
         key = tuple(x1) + tuple(x2)
+        key_rev = tuple(x2) + tuple(x1)
 
         if key in self.kernel_cache:
             return self.kernel_cache[key]
+        if key_rev in self.kernel_cache:
+            return self.kernel_cache[key_rev]
 
         x1 = np.array(x1).reshape(1, -1)
         x2 = np.array(x2).reshape(1, -1)
 
-        kernel_matrix = self.quantum_kernel.evaluate(x1, x2)
-
-        value = kernel_matrix[0][0]
+        value = self.quantum_kernel.evaluate(x1, x2)[0][0]
 
         self.kernel_cache[key] = value
 
@@ -163,12 +164,15 @@ class QuantumDecisionTreeClassifier(SerializableModelMixin):
                 x_left = np.mean(X[left_idxs], axis=0)
                 x_right = np.mean(X[right_idxs], axis=0)
 
-                # calcular similaridade quântica
-                q_sim = self._quantum_similarity(x_left, x_right)
+                # pré-calcular média geral
+                centroid = np.mean(X, axis=0)
+
+                # comparar só com isso
+                q_sim = self._quantum_similarity(x_left, centroid)
 
                 # score híbrido (gain information * quantum similarity)
                 q_dist = 1 - q_sim
-                alpha = 0.8
+                alpha = 0.5
                 score = alpha * gain + (1 - alpha) * q_dist
 
                 if score > best_score:
